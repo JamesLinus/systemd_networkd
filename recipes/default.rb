@@ -7,39 +7,124 @@
 # All rights reserved - Do Not Redistribute
 #
 
-# include recipes if they are defined by the user attributes
-if node.include?( "SystemdNetworkd" )
-  if node[ "SystemdNetworkd" ].include?( "Cookbooks" )
+require 'date'
+time_string = DateTime.now.strftime( "%Y%m%d%H%M" )
+backup = node[ "SystemdNetworkd" ][ "Backup" ]
 
-    if node[ "SystemdNetworkd" ][ "Cookbooks" ].include?( "FDB" )
-      if node[ "SystemdNetworkd" ][ "Cookbooks" ][ "FDB" ] == "true"
-        include_recipe 'systemd_networkd_fdb'
-      end
-    end
+if backup == true
+  outdir = "/etc/systemd/network/backup/#{time_string}"
+else
+  outdir = "/etc/systemd/network"
+end
 
-    if node[ "SystemdNetworkd" ][ "Cookbooks" ].include?( "Link" )
-      if node[ "SystemdNetworkd" ][ "Cookbooks" ][ "Link" ] == "true"
-        include_recipe 'systemd_networkd_link'
-      end
-    end
+node.default[ "SystemdNetworkd" ][ "outdir" ] = outdir
 
-    if node[ "SystemdNetworkd" ][ "Cookbooks" ].include?( "Switchport" )
-      if node[ "SystemdNetworkd" ][ "Cookbooks" ][ "Switchport" ] == "true"
-        include_recipe 'systemd_networkd_switchport'
-      end
-    end
-  
-    if node[ "SystemdNetworkd" ][ "Cookbooks" ].include?( "UFD" )
-      if node[ "SystemdNetworkd" ][ "Cookbooks" ][ "UFD" ] == "true"
-        include_recipe 'systemd_networkd_ufd'
-      end
-    end
-
-    if node[ "SystemdNetworkd" ][ "Cookbooks" ].include?( "Team" )
-      if node[ "SystemdNetworkd" ][ "Cookbooks" ][ "Team" ] == "true"
-        include_recipe 'systemd_networkd_team'
-      end
-    end
-
+createdirs = [ "/etc/systemd/network" , "/etc/systemd/network/backup" ]
+createdirs.each do |dir|
+  ### Create networkd dirs if they don't exist ###
+  directory "/etc/systemd/network" do
+    owner 'systemd-network'
+    group 'systemd-network'
+    mode '0755'
+    action :create
   end
 end
+
+### create backup dir
+directory outdir do
+  owner 'systemd-network'
+  group 'systemd-network'
+  mode '0755'
+  action :create
+  only_if { backup == true }
+end
+
+
+### Delete unused systemd directories ###
+deletedirs = [ "/usr/lib/systemd/network/" , "/run/systemd/network/" , "/lib/systemd/network/" ]
+deletedirs.each do |deldir|
+  directory deldir do
+    recursive true
+    action :delete
+  end
+end
+
+### Restart service ###
+service "systemd-networkd" do
+  supports :restart => true, :reload => true
+  action :nothing
+end
+
+## Execute command ###
+execute "udevadm-trigger-net-add" do
+  command "udevadm trigger --subsystem-match=net --action=add"
+  action :nothing
+end
+
+include_recipe "systemd_networkd::link"
+include_recipe "systemd_networkd::switchport"
+include_recipe "systemd_networkd::cpuport"
+include_recipe "systemd_networkd::team"
+include_recipe "systemd_networkd::static_mac_table"
+include_recipe "systemd_networkd::ufd"
+include_recipe "systemd_networkd::backup"
+
+ports_enabled = []
+ufds_enabled = []
+teams_enabled = []
+
+node[ "SystemdNetworkd" ][ "PortId" ].each do |port|
+  if node.include?( "SystemdNetworkd" )
+    if node[ "SystemdNetworkd" ].include?( "Ports" )
+      if node[ "SystemdNetworkd" ][ "Ports" ].include?( port )
+        if node[ "SystemdNetworkd" ][ "Ports" ][ port ].include?( "Enabled" )
+          if node[ "SystemdNetworkd" ][ "Ports" ][ port ][ "Enabled" ] == true
+            
+	    ports_enabled.push( port )
+
+          end
+        end
+      end
+    end
+
+    if node[ "SystemdNetworkd" ].include?( "UFD" )
+      if node[ "SystemdNetworkd" ][ "UFD" ].include?( port )
+        if node[ "SystemdNetworkd" ][ "UFD" ][ port ].include?( "Enabled" )
+          if node[ "SystemdNetworkd" ][ "UFD" ][ port ][ "Enabled" ] == true
+
+            ufds_enabled.push( port )
+
+          end
+        end
+      end
+    end
+  end
+end
+
+if node.include?( "SystemdNetworkd" )
+  if node[ "SystemdNetworkd" ].include?( "Teams" )
+    node[ "SystemdNetworkd" ][ "Teams" ].each do |team,teamopts|
+      if node[ "SystemdNetworkd" ][ "Teams" ][ team ].include?( "Enabled" )
+        if node[ "SystemdNetworkd" ][ "Teams" ][ team ][ "Enabled" ] == true
+
+          teams_enabled.push( team )
+
+        end
+      end
+    end    
+  end
+end
+
+ret = del_files( ports_enabled, ufds_enabled, teams_enabled )
+
+ruby_block "conditional-restart" do
+  block do
+    ### Empty block ###
+  end
+  notifies :restart, "service[systemd-networkd]", :delayed
+  not_if do 
+    ret == 0 || ( backup != false && backup != nil ) 
+  end 
+end
+
+
