@@ -3,11 +3,11 @@ systemd_networkd Cookbook
 This cookbook is responsible for configuring systemd-networkd.
 A modified version of systemd networkd is required.
 
-This can be found @ https://github.com/proxykillah/systemd
+This can be found @ https://github.com/Intel-Corp/systemd
 
 Requirements
 ------------
-- `systemd` - systemd_networkd required systemd > 216
+- `systemd` - systemd_networkd requires systemd > 216
 
 Attributes
 ----------
@@ -24,6 +24,7 @@ Recipes
 - switchport: configures port attributes
 - team: configures LAGs and LAG-specific features (e.g. LAG attributes)
 - ufd: configures uplink failure detection
+- backup: copies pre-requisities for backup tool - see below for ussage
 
 Usage
 -----
@@ -185,6 +186,32 @@ Below is a fully working example of the relevant configuration options.
     }
   }
 }
+```
+
+Backup Tool and Usage
+---------------------
+```text
+
+2 Methods of runing the backup or dumping the memory resident configuration
+
+There are 2 files in systemd_networkd/files/default
+
+1) cfgdump.rb 
+   Copied to /usr/bin/cfgdump
+2) intel_switch.rb 
+   Copied to /opt/chef/embedded/apps/ohai/lib/ohai/plugins/intel/intel_switch.rb
+
+Method 1 (Chef Server):
+On the chef workstation, modify the configuration to include a key "Backup": true under "SystemdNetworkd".
+You will need the cookbook "ohai" and copy the intel_switch plugin to the cookbooks/ohai/files/ directory.
+Running the chef-client on the node will result in /etc/systemd/network/backup/XXXX being created.
+
+Method 2 (Solo):
+You should clone your working copy of the chef repo to a node.
+Copy the ohai plugin to /opt/chef/embedded/apps/ohai/lib/ohai/plugins/intel/intel_switch.rb 
+Copy the cfgdump.rb to /usr/bin/cfgdump
+Execute cfgdump
+
 ```
 
 License and Authors

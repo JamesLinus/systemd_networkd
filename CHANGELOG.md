@@ -1,6 +1,24 @@
 systemd_networkd CHANGELOG
 ==========================
 
+0.2.7
+-----
+- Added the ohai plugin - This should be copied using the ohai cookbook
+- Fixed bug in folder creation
+
+0.2.6
+-----
+- Readme cleanup
+
+0.2.5
+-----
+- More Food critic fixes
+
+0.2.4
+-----
+- More Food critic fixes
+- Changes in GIT repository location on github
+
 0.2.3
 -----
 - Readme and Food critics

@@ -22,7 +22,7 @@ node.default[ "SystemdNetworkd" ][ "outdir" ] = outdir
 createdirs = [ "/etc/systemd/network" , "/etc/systemd/network/backup" ]
 createdirs.each do |dir|
   ### Create networkd dirs if they don't exist ###
-  directory "/etc/systemd/network" do
+  directory dir do
     owner 'systemd-network'
     group 'systemd-network'
     mode '0755'
@@ -61,13 +61,14 @@ execute "udevadm-trigger-net-add" do
   action :nothing
 end
 
+
+include_recipe "systemd_networkd::backup"
 include_recipe "systemd_networkd::link"
 include_recipe "systemd_networkd::switchport"
 include_recipe "systemd_networkd::cpuport"
 include_recipe "systemd_networkd::team"
 include_recipe "systemd_networkd::static_mac_table"
 include_recipe "systemd_networkd::ufd"
-include_recipe "systemd_networkd::backup"
 
 ports_enabled = []
 ufds_enabled = []
